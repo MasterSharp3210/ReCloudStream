@@ -1,9 +1,6 @@
 # CloudStream
 
-**⚠️ Warning: By default, this app doesn't provide any video sources; you have to install extensions to add functionality to the app.**
-<p align="left"><a href="https://github.com/recloudstream/cloudstream/releases/download/pre-release/app-prerelease-release.apk"><img src=".github/images/download-cloudstream-pre.png" alt="Download Cloudstream Pre-Release" width=430/></a></p>
-
-[![Discord](https://invidget.switchblade.xyz/5Hus6fM)](https://discord.gg/5Hus6fM)
+*As you might imagine or already know, apps and solutions for viewing multimedia content have almost always been short-lived. They typically last only about 10 days—or, at best, a few months—before you’re forced to abandon them and move on to other platforms. ReCloudStream, by contrast, is built upon a foundation of long-term databases and code. Consequently, there won’t be frequent updates; my goal is to make the original 'CloudStream' project more secure and sustainable over time.*
 
 
 ## Table of Contents: 
