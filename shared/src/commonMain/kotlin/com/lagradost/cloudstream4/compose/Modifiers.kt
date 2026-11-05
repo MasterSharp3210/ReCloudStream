@@ -53,8 +53,7 @@ fun Modifier.circleBorder(size: Dp): Modifier =
 
 
 /**
- * If we should have outlines on items when focused by default, this should be false for desktop
- * as we do not use a dpad for that
+ * Keep outlines enabled by default for Android TV focus navigation.
  * */
 val LocalFocusOutlineDefault: ProvidableCompositionLocal<Boolean> =
     staticCompositionLocalOf { true }

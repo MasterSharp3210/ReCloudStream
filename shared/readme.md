@@ -10,11 +10,11 @@ seamless porting process. For inspiration and code in a similar codebase, take a
 
 ### File structure
 
-The `shared` directory is supposed to be for shared compose UI between platforms, and can act as a glue for business logic. 
+The `shared` directory contains Compose UI and presentation logic used by the Android app. Android-specific integrations
+belong in `androidMain`. The application currently targets Android only; this module does not build a desktop client.
 This is separate from the `library` that includes the primitives for a headless, cross-platform plugin system.
-Note that we do not want a shared screen layout, because each platform has its own design language and quirks.
-Instead, the ViewModels should be entirely detached from the rendering process, and each UI component should be shared 
-between every platform. This ensures ViewModels cant cheat with dirty escape hatches, a leaky api or 
+ViewModels should be detached from the rendering process, and reusable UI components should not depend on Android views.
+This keeps presentation logic from relying on dirty escape hatches, a leaky API or
 with UI elements that hijack business logic. 
 
 **Include**:
@@ -23,17 +23,15 @@ with UI elements that hijack business logic.
 **Avoid**:
 *Entire Screens*, *Plugin APIs* and *Android Layout XML*
 
-Please also note that while it would be nice with an e.g. cross-platform downloader or video player.
-It is simply infeasible and undesirable to write such a system. Therefore, each platform should have
-a seperate implemenation of platform specific behavior that closly interop with native systems.
+The downloader and video player remain in the Android app and use Android platform APIs. They are intentionally
+separate from the shared presentation module.
 
 ### MVI
 
-MVI (Model View Intent) is the core structure for building cross-platform UI we will use.
+MVI (Model View Intent) is the core structure for building Compose UI we will use.
 The reason for this decision is that current MVVM architecture created a lot of boilerplate,
 and is very unwieldy when working with compose. We will instead use a single immutable UI state, using
-kotlin immutable collections, as that creates thread-safe and performant UI. Additionally, because the viewmodel
-is shared between platforms, the Viewmodel must be provided with an implementation specific 
+kotlin immutable collections, as that creates thread-safe and performant UI. ViewModels must be provided with an implementation-specific
 database/preference/downloaded by using dependency injection and composition. 
 
 **Use**: 
@@ -91,13 +89,13 @@ CloudStream 3. Android Native XML was simply the least bad option when building 
 
 The current android app is named CloudStream 3, and this Compose rewrite will be named 
 CloudStream 4. However, the android app will be upgraded, not replaced with Compose. It aims to be a 
-seamless and gradual rollout of updates for everyone using the Android app. Therefore, CloudStream 4 
-is used to refer to the new compose UI, features, and cross-platform support.
+seamless and gradual rollout of updates for everyone using the Android app. Therefore, CloudStream 4
+is used to refer to the new Compose UI and features.
 
 ## AI Usage
 
-Due to the prevalence and popularity of LLMs, CloudStream 3 has been rewritten entirely 4+ times by 
-independent actors using Compose to target desktop with different LLM models. These have not been merged, due to the 
+Due to the prevalence and popularity of LLMs, CloudStream 3 has been rewritten entirely 4+ times by
+independent actors using Compose for other platforms. These have not been merged, due to the
 absolute mess of the AI generated codebase, both in code quality and performance. 
 
 Therefore, I (LagradOst) will not accept or allow any pull requests concering the Compose rewrite

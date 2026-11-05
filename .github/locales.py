@@ -8,6 +8,7 @@ SETTINGS_PATH = "app/src/main/java/com/lagradost/cloudstream3/ui/settings/Settin
 START_MARKER = "/* begin language list */"
 END_MARKER = "/* end language list */"
 XML_NAME = "app/src/main/res/values-b+"
+SUPPORTED_LANGUAGES = {"en", "it"}
 ISO_MAP_URL = "https://raw.githubusercontent.com/haliaeetus/iso-639/master/data/iso_639-1.min.json"
 INDENT = " "*4
 
@@ -22,11 +23,14 @@ rest, after_src = rest.split(END_MARKER)
 languages = {}
 for lang in re.finditer(r'Pair\("(.*)", "(.*)"\)', rest):
     name, iso = lang.groups()
-    languages[iso] = name
+    if iso in SUPPORTED_LANGUAGES:
+        languages[iso] = name
 
 # Add not yet added langs
 for folder in glob.glob(f"{XML_NAME}*"):
     iso = folder[len(XML_NAME):].replace("+", "-")
+    if iso not in SUPPORTED_LANGUAGES:
+        continue
     if iso not in languages.keys():
         entry = iso_map.get(iso.lower(), {'nativeName':iso}) # fallback to iso code if not found
         languages[iso] = entry['nativeName'].split(',')[0] # first name if there are multiple

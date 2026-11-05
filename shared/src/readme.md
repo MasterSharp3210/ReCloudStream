@@ -1,11 +1,9 @@
-https://kotlinlang.org/docs/multiplatform/compose-multiplatform-create-first-app.html#examine-the-project-structure
+# Shared module source sets
 
-`jvmMain` contains source files for the desktop target, which uses Kotlin/JVM.
+The `shared` module contains Compose UI, state, themes, and ViewModels used by the Android app.
 
-`androidMain` contains Android source files and targets Kotlin/JVM.
+- `commonMain` contains shared Compose code and resources.
+- `androidMain` contains Android-specific UI integration and platform implementations.
+- `composeResources` contains shared Compose images, fonts, and strings.
 
-`iosMain` contains Kotlin code for iOS and targets Kotlin/Native.
-
-`jsMain` contains JavaScript-specific Kotlin code and targets Kotlin/JS.
-
-`wasmJsMain` contains Wasm-specific Kotlin code and targets Kotlin/Wasm.
+The application currently targets Android only. The plugin API's JVM and web targets are maintained separately in `library`.

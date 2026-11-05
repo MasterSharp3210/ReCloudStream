@@ -1,4 +1,8 @@
-# CloudStream
+<p align="center">
+  <img src="app/src/main/ic_launcher-playstore.png" alt="ReCloudStream Logo" width="128" />
+</p>
+
+# ReCloudStream
 
 *As you might imagine or already know, apps and solutions for viewing multimedia content have almost always been short-lived. They typically last only about 10 days—or, at best, a few months—before you’re forced to abandon them and move on to other platforms. ReCloudStream, by contrast, is built upon a foundation of long-term databases and code. Consequently, there won’t be frequent updates; my goal is to make the original 'CloudStream' project more secure and sustainable over time.*
 
@@ -6,6 +10,7 @@
 ## Table of Contents: 
 + [About Us:](#about_us)
 + [Installation Steps:](#install_rules)
++ [Changes from Original:](#changes_from_original)
 + [Contributing:](#contributing)
 + [Issues:](#issues)
   + [Bugs Reports:](#bug_report)
@@ -19,9 +24,9 @@
 
 ## About us: 
 
-**CloudStream is a media center that prioritizes and emphasizes complete freedom and flexibility for users and developers.** 
+**ReCloudStream is a media center that prioritizes and emphasizes complete freedom and flexibility for users and developers.**
 
-CloudStream is an extension-based multimedia player with tracking support. There are extensions to view videos from: 
+ReCloudStream is an extension-based multimedia player with tracking support. There are extensions to view videos from:
 
 + [Librevox (audio-books)](https://librivox.org/) 
 + [Youtube](https://www.youtube.com/)
@@ -54,6 +59,23 @@ Our documentation is unmaintained and open to contributions; therefore, apps and
 Our documentation provides the steps to install and configure CloudStream for your streaming needs.
 
 [Getting Started With CloudStream:](https://recloudstream.github.io/csdocs/)
+
+<a id="changes_from_original"></a>
+
+## Changes from Original Project:
+
+ReCloudStream includes several enhancements and bug fixes compared to the original CloudStream project to ensure better stability, security, and user experience:
+
+### 🎬 Subtitle Engine Improvements
+* **Format Resilience**: Flexible detection of `.srt` and WebVTT files, handling control characters, Byte Order Mark (`\uFEFF`), and non-standard header lines.
+* **Desynchronization & Skipped Dialog Fixes**: Resolved parsing bugs in `CustomSubripParser` that caused skipped dialogs or misplaced lines when encountering malformed cue indices.
+* **End-of-Video Truncation Fix**: Corrected buffer size management during decoding, preventing subtitles from being cut off during the final minutes of playback.
+* **Accented Encoding Support (Windows-1252 / ISO-8859-1)**: Automatic charset detection for European and Italian subtitles (`à, è, é, ì, ò, ù`), eliminating corrupted or garbled text characters.
+* **Overlapping Subtitles**: Set `MERGE` behavior as default so concurrent subtitles and on-screen text in the same timestamp display simultaneously rather than replacing each other.
+* **Offset & Delay Sync Stability**: Retained active decoder references to prevent "No subtitles loaded" errors when adjusting subtitle timing in the sync menu.
+
+### ⚙️ Build System & Toolchain
+* **Gradle 9+ Compatibility**: Integrated Foojay Toolchain Resolver plugin (`1.0.0`) in `settings.gradle.kts` for automatic Java 17 toolchain provisioning.
 
 <a id="contributing"></a>
 
@@ -92,18 +114,12 @@ While we **actively** accept issues and pull requests, we do require you fill ou
 As well as providing clear install steps, our [website](https://dweb.link/ipns/cloudstream.on.fleek.co/) includes a wide variety of other tools, such as: 
 - [Troubleshooting](https://recloudstream.github.io/csdocs/troubleshooting/)
 - [Further CloudStream Repositories](https://recloudstream.github.io/csdocs/repositories/) 
-- Set-Up for other devices, such as:
-  - [Android TV](https://recloudstream.github.io/csdocs/other-devices/tv/)
-  - [Windows](https://recloudstream.github.io/csdocs/other-devices/windows/)
-  - [Linux](https://recloudstream.github.io/csdocs/other-devices/linux/)
+- Set-Up for Android devices, including [Android TV](https://recloudstream.github.io/csdocs/other-devices/tv/).
+- ReCloudStream currently provides an Android app; desktop clients are not included.
 - And more...
 
 <a id="languages"> </a>  
 
 ### Supported languages:
 
-Even if you can't contribute to the code or documentation, we always look for those who can contribute to translation and language support. Your contribution is exceptionally appreciated; you can check our translation from the figure below. 
-
-<a href="https://hosted.weblate.org/engage/cloudstream/">
-  <img src="https://hosted.weblate.org/widgets/cloudstream/-/app/multi-auto.svg" alt="Translation status" />
-</a>
+The app interface is available in English and Italian. English is the default language; Italian can be selected during setup or from Settings.

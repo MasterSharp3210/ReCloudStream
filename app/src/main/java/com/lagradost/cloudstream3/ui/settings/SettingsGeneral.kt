@@ -75,69 +75,8 @@ fun getCurrentLocale(context: Context): String {
 */
 val appLanguages = arrayListOf(
     /* begin language list */
-    Pair("Afrikaans", "af"),
-    Pair("Azərbaycan dili", "az"),
-    Pair("Bahasa Indonesia", "in"),
-    Pair("Bahasa Melayu", "ms"),
-    Pair("català", "ca"),
-    Pair("Deutsch", "de"),
     Pair("English", "en"),
-    Pair("Español", "es"),
-    Pair("Esperanto", "eo"),
-    Pair("Français", "fr"),
-    Pair("Galego", "gl"),
-    Pair("hrvatski", "hr"),
     Pair("Italiano", "it"),
-    Pair("Latviešu valoda", "lv"),
-    Pair("Lietuvių kalba", "lt"),
-    Pair("Magyar", "hu"),
-    Pair("Malti", "mt"),
-    Pair("mmmm... monke", "qt"),
-    Pair("Nederlands", "nl"),
-    Pair("Norsk bokmål", "no"),
-    Pair("Norsk nynorsk", "nn"),
-    Pair("Polski", "pl"),
-    Pair("Português", "pt"),
-    Pair("Português (Brasil)", "pt-BR"),
-    Pair("Română", "ro"),
-    Pair("Shqip мова", "sq"),
-    Pair("Slovenčina", "sk"),
-    Pair("Soomaaliga", "so"),
-    Pair("Svenska", "sv"),
-    Pair("Tagalog", "tl"),
-    Pair("Tiếng Việt", "vi"),
-    Pair("Türkçe", "tr"),
-    Pair("Wikang Filipino", "fil"),
-    Pair("Čeština", "cs"),
-    Pair("Ελληνικά", "el"),
-    Pair("беларуская мова", "be"),
-    Pair("български", "bg"),
-    Pair("македонски", "mk"),
-    Pair("русский", "ru"),
-    Pair("українська", "uk"),
-    Pair("עברית", "iw"),
-    Pair("اردو", "ur"),
-    Pair("العربية", "ar"),
-    Pair("اللهجة النجدية", "ars"),
-    Pair("عربي شامي", "apc"),
-    Pair("فارسی", "fa"),
-    Pair("کوردیی ناوەندی", "ckb"),
-    Pair("नेपाली", "ne"),
-    Pair("हिन्दी", "hi"),
-    Pair("অসমীয়া", "as"),
-    Pair("বাংলা", "bn"),
-    Pair("ଓଡ଼ିଆ", "or"),
-    Pair("தமிழ்", "ta"),
-    Pair("ಕನ್ನಡ", "kn"),
-    Pair("മലയാളം", "ml"),
-    Pair("ພາສາລາວ", "lo"),
-    Pair("ဗမာစာ", "my"),
-    Pair("ትግርኛ", "ti"),
-    Pair("አማርኛ", "am"),
-    Pair("中文", "zh"),
-    Pair("日本語 (にほんご)", "ja"),
-    Pair("正體中文(臺灣)", "zh-TW"),
-    Pair("한국어", "ko"),
 /* end language list */
 ).sortedBy { it.first.lowercase(Locale.ROOT) } // ye, we go alphabetical, so ppl don't put their lang on top
 
@@ -281,10 +220,11 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
 
 
         getPref(R.string.locale_key)?.setOnPreferenceClickListener { pref ->
-            val current = getCurrentLocale(pref.context)
+            val current = getCurrentLocale(pref.context).replace('_', '-')
             val languageTagsIETF = appLanguages.map { it.second }
             val languageNames = appLanguages.map { it.nameNextToFlagEmoji() }
-            val currentIndex = languageTagsIETF.indexOf(current)
+            val currentIndex = languageTagsIETF.indexOf(current).takeIf { it >= 0 }
+                ?: languageTagsIETF.indexOf(current.substringBefore('-'))
 
             activity?.showDialog(
                 languageNames, currentIndex, getString(R.string.app_language), true, { }

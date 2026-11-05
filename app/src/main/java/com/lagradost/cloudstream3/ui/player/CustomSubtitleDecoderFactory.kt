@@ -30,6 +30,7 @@ import com.lagradost.cloudstream3.ui.subtitles.SubtitlesFragment
 import org.mozilla.universalchardet.UniversalDetector
 import java.lang.ref.WeakReference
 import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 
 /**
  * @param fallbackFormat used to create a decoder based on mimetype if the subtitle string is not
@@ -65,6 +66,7 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
         /** Subtitle offset in milliseconds */
         var subtitleOffset: Long = 0
         private const val UTF_8 = "UTF-8"
+        private const val WINDOWS_1252 = "windows-1252"
         private const val TAG = "CustomDecoder"
         private var overrideEncoding: String? = null
         val style: SaveCaptionStyle get() = SubtitlesFragment.getCurrentSavedStyle()
@@ -106,51 +108,47 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
             else -> Cue.DIMEN_UNSET
         }
 
+        private fun isValidUtf8(bytes: ByteArray): Boolean {
+            var i = 0
+            while (i < bytes.size) {
+                val b = bytes[i].toInt() and 0xFF
+                if (b < 0x80) {
+                    i++
+                } else if (b in 0xC2..0xDF) {
+                    if (i + 1 >= bytes.size) return false
+                    val b1 = bytes[i + 1].toInt() and 0xFF
+                    if (b1 !in 0x80..0xBF) return false
+                    i += 2
+                } else if (b in 0xE0..0xEF) {
+                    if (i + 2 >= bytes.size) return false
+                    val b1 = bytes[i + 1].toInt() and 0xFF
+                    val b2 = bytes[i + 2].toInt() and 0xFF
+                    if (b1 !in 0x80..0xBF || b2 !in 0x80..0xBF) return false
+                    i += 3
+                } else if (b in 0xF0..0xF4) {
+                    if (i + 3 >= bytes.size) return false
+                    val b1 = bytes[i + 1].toInt() and 0xFF
+                    val b2 = bytes[i + 2].toInt() and 0xFF
+                    val b3 = bytes[i + 3].toInt() and 0xFF
+                    if (b1 !in 0x80..0xBF || b2 !in 0x80..0xBF || b3 !in 0x80..0xBF) return false
+                    i += 4
+                } else {
+                    return false
+                }
+            }
+            return true
+        }
+
         /**
          * Fixes alignment for cues with {\anX},
          * this is common for .vtt that should be parsed as .srt
-         *
-         * ```
-         * WEBVTT
-         *
-         * 00:00.000 --> 00:01.000
-         * {\an1}Label 1
-         *
-         * 00:01.000 --> 00:02.000
-         * {\an2}Label 2
-         *
-         * 00:02.000 --> 00:03.000
-         * {\an3}Label 3
-         *
-         * 00:03.000 --> 00:04.000
-         * {\an4}Label 4
-         *
-         * 00:04.000 --> 00:05.000
-         * {\an5}Label 5
-         *
-         * 00:05.000 --> 00:06.000
-         * {\an6}Label 6
-         *
-         * 00:06.000 --> 00:07.000
-         * {\an7}Label 7
-         *
-         * 00:07.000 --> 00:08.000
-         * {\an8}Label 8
-         *
-         * 00:08.000 --> 00:09.000
-         * {\an9}Label 9
-         * ```
          */
         fun Cue.Builder.fixSubtitleAlignment(): Cue.Builder {
             var trimmed = text?.trim() ?: return this
-            // https://github.com/androidx/media/blob/main/libraries/extractor/src/main/java/androidx/media3/extractor/text/ssa/SsaStyle.java
-            // exoplayer can already parse this, however for eg webvtt it fails
             locationRegex.find(trimmed)?.groupValues?.get(1)?.toIntOrNull()?.let { alignment ->
-                // toLineAnchor
                 this.setSubtitleAlignment(alignment)
             }
 
-            // remove all matches, so we do not display \anx
             trimmed = trimmed.replace(locationRegex, "")
             setText(trimmed)
             return this
@@ -169,7 +167,6 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
                     computeDefaultLineOrPosition(anchor), Cue.LINE_TYPE_FRACTION
                 )
             }
-            // toPositionAnchor
             when (alignment) {
                 SSA_ALIGNMENT_BOTTOM_LEFT, SSA_ALIGNMENT_MIDDLE_LEFT, SSA_ALIGNMENT_TOP_LEFT -> Cue.ANCHOR_TYPE_START
                 SSA_ALIGNMENT_BOTTOM_CENTER, SSA_ALIGNMENT_MIDDLE_CENTER, SSA_ALIGNMENT_TOP_CENTER -> Cue.ANCHOR_TYPE_MIDDLE
@@ -180,7 +177,6 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
                 setPosition(computeDefaultLineOrPosition(anchor))
             }
 
-            // toTextAlignment
             when (alignment) {
                 SSA_ALIGNMENT_BOTTOM_LEFT, SSA_ALIGNMENT_MIDDLE_LEFT, SSA_ALIGNMENT_TOP_LEFT -> Layout.Alignment.ALIGN_NORMAL
                 SSA_ALIGNMENT_BOTTOM_CENTER, SSA_ALIGNMENT_MIDDLE_CENTER, SSA_ALIGNMENT_TOP_CENTER -> Layout.Alignment.ALIGN_CENTER
@@ -197,24 +193,21 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
 
     private fun getStr(byteArray: ByteArray): Pair<String, Charset> {
         val encoding = try {
-            val encoding = overrideEncoding ?: run {
+            overrideEncoding ?: run {
                 val detector = UniversalDetector()
-
                 detector.handleData(byteArray, 0, byteArray.size)
                 detector.dataEnd()
-
-                detector.detectedCharset // "windows-1256"
+                val detected = detector.detectedCharset
+                if (detected == null || detected.equals("ISO-8859-1", ignoreCase = true) || detected.equals("WINDOWS-1252", ignoreCase = true)) {
+                    if (isValidUtf8(byteArray)) UTF_8 else WINDOWS_1252
+                } else {
+                    detected
+                }
             }
-
-            Log.i(
-                TAG,
-                "Detected encoding with charset $encoding and override = $overrideEncoding"
-            )
-            encoding ?: UTF_8
         } catch (e: Exception) {
             Log.e(TAG, "Failed to detect encoding throwing error")
             logError(e)
-            UTF_8
+            if (isValidUtf8(byteArray)) UTF_8 else WINDOWS_1252
         }
 
         return try {
@@ -223,34 +216,25 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse using encoding $encoding")
             logError(e)
-            Pair(byteArray.decodeToString(), charset(UTF_8))
+            Pair(byteArray.decodeToString(), Charset.forName(UTF_8))
         }
     }
 
     private fun getSubtitleParser(data: String): SubtitleParser? {
-        // This way we read the subtitle file and decide what decoder to use instead of relying fully on mimetype
-
-        // First we remove all invisible characters at the start, this is an issue in some subtitle files
-        // Cntrl is control characters: https://en.wikipedia.org/wiki/Unicode_control_characters
-        // Cf is formatting characters: https://www.compart.com/en/unicode/category/Cf
         val controlCharsRegex = Regex("""[\p{Cntrl}\p{Cf}]""")
         val trimmedText =
             data.trimStart { it.isWhitespace() || controlCharsRegex.matches(it.toString()) }
 
-        //https://github.com/LagradOst/CloudStream-2/blob/ddd774ee66810137ff7bd65dae70bcf3ba2d2489/CloudStreamForms/CloudStreamForms/Script/MainChrome.cs#L388
-        val subtitleParser = when {
-            // "WEBVTT" can be hidden behind invisible characters not filtered by trim
-            trimmedText.substring(0, 10).contains("WEBVTT", ignoreCase = true) -> WebvttParser()
-            trimmedText.startsWith("<?xml version=\"", ignoreCase = true) -> TtmlParser()
-            (trimmedText.startsWith(
-                "[Script Info]",
-                ignoreCase = true
-            ) || trimmedText.startsWith(
-                "Title:",
-                ignoreCase = true
-            )) -> SsaParser(fallbackFormat?.initializationData)
+        val headerSample = trimmedText.take(500)
 
-            trimmedText.startsWith("1", ignoreCase = true) -> CustomSubripParser()
+        val subtitleParser = when {
+            headerSample.contains("WEBVTT", ignoreCase = true) -> WebvttParser()
+            headerSample.startsWith("<?xml", ignoreCase = true) || headerSample.startsWith("<tt", ignoreCase = true) -> TtmlParser()
+            (headerSample.startsWith("[Script Info]", ignoreCase = true) ||
+                    headerSample.startsWith("Title:", ignoreCase = true) ||
+                    headerSample.contains("[Events]", ignoreCase = true)) -> SsaParser(fallbackFormat?.initializationData)
+
+            headerSample.contains("-->") || headerSample.firstOrNull()?.isDigit() == true -> CustomSubripParser()
             fallbackFormat != null -> {
                 when (fallbackFormat.sampleMimeType) {
                     MimeTypes.TEXT_VTT -> WebvttParser()
@@ -259,30 +243,18 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
                     MimeTypes.APPLICATION_TTML -> TtmlParser()
                     MimeTypes.APPLICATION_SUBRIP -> CustomSubripParser()
                     MimeTypes.APPLICATION_TX3G -> Tx3gParser(fallbackFormat.initializationData)
-                    // These decoders are not converted to parsers yet
-                    // TODO
-//                            MimeTypes.APPLICATION_CEA608, MimeTypes.APPLICATION_MP4CEA608 -> Cea608Decoder(
-//                                mimeType,
-//                                fallbackFormat.accessibilityChannel,
-//                                Cea608Decoder.MIN_DATA_CHANNEL_TIMEOUT_MS
-//                            )
-//                            MimeTypes.APPLICATION_CEA708 -> Cea708Decoder(
-//                                fallbackFormat.accessibilityChannel,
-//                                fallbackFormat.initializationData
-//                            )
                     MimeTypes.APPLICATION_DVBSUBS -> DvbParser(fallbackFormat.initializationData)
                     MimeTypes.APPLICATION_PGS -> PgsParser()
-                    else -> null
+                    else -> CustomSubripParser()
                 }
             }
 
-            else -> null
+            else -> CustomSubripParser()
         }
         return subtitleParser
     }
 
     val currentSubtitleCues = mutableListOf<SubtitleCue>()
-
 
     override fun parse(
         data: ByteArray,
@@ -293,10 +265,8 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
     ) {
         val currentStyle = style
         val customOutput = Consumer<CuesWithTiming> { cue ->
-            val newCue =
-                CuesWithTiming(cue.cues, cue.startTimeUs, cue.durationUs)
+            val newCue = CuesWithTiming(cue.cues, cue.startTimeUs, cue.durationUs)
 
-            // Do not apply the offset to the currentSubtitleCues as those are then used for sync subs
             currentSubtitleCues.add(
                 SubtitleCue(
                     newCue.startTimeUs / 1000,
@@ -304,7 +274,6 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
                     newCue.cues.map { it.text.toString() })
             )
 
-            // offset timing for the final
             val updatedCues =
                 CuesWithTiming(
                     newCue.cues,
@@ -314,17 +283,11 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
 
             output.accept(updatedCues)
         }
-        Log.i(TAG, "Parse subtitle, current parser: $realDecoder")
         try {
             val inputString = getStr(data).first
-            Log.i(TAG, "Subtitle preview: ${inputString.substring(0, 30)}")
             if (inputString.isNotBlank()) {
                 var str: String = trimStr(inputString)
                 realDecoder = realDecoder ?: getSubtitleParser(inputString)
-                Log.i(
-                    TAG,
-                    "Parser selected: $realDecoder"
-                )
                 realDecoder?.let { decoder ->
                     if (decoder !is SsaParser) {
                         if (currentStyle.removeBloat)
@@ -336,11 +299,11 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
                         }
                     }
                 }
-                val array = str.toByteArray()
+                val array = str.toByteArray(StandardCharsets.UTF_8)
                 realDecoder?.parse(
                     array,
-                    minOf(array.size, offset),
-                    minOf(array.size, length),
+                    0,
+                    array.size,
                     outputOptions,
                     customOutput
                 )
@@ -351,8 +314,7 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
     }
 
     override fun getCueReplacementBehavior(): Int {
-        // CUE_REPLACEMENT_BEHAVIOR_REPLACE seems most compatible, change if required
-        return realDecoder?.cueReplacementBehavior ?: Format.CUE_REPLACEMENT_BEHAVIOR_REPLACE
+        return realDecoder?.cueReplacementBehavior ?: Format.CUE_REPLACEMENT_BEHAVIOR_MERGE
     }
 
     override fun reset() {
@@ -373,28 +335,21 @@ class CustomSubtitleDecoderFactory : SubtitleDecoderFactory {
             MimeTypes.APPLICATION_MP4VTT,
             MimeTypes.APPLICATION_SUBRIP,
             MimeTypes.APPLICATION_TX3G,
-            //MimeTypes.APPLICATION_CEA608,
-            //MimeTypes.APPLICATION_MP4CEA608,
-            //MimeTypes.APPLICATION_CEA708,
             MimeTypes.APPLICATION_DVBSUBS,
             MimeTypes.APPLICATION_PGS,
-            //MimeTypes.TEXT_EXOPLAYER_CUES
         ).contains(format.sampleMimeType)
     }
 
+    private var activeDecoder: CustomDecoder? = null
     private var latestDecoder: WeakReference<CustomDecoder>? = null
 
     fun getSubtitleCues(): List<SubtitleCue>? {
-        return latestDecoder?.get()?.currentSubtitleCues
+        return activeDecoder?.currentSubtitleCues ?: latestDecoder?.get()?.currentSubtitleCues
     }
 
-    /**
-     * Decoders created here persists across reset()
-     * Do not save state in the decoder which you want to reset (e.g subtitle offset)
-     */
     override fun createDecoder(format: Format): SubtitleDecoder {
         val parser = CustomDecoder(format)
-        // Allow garbage collection if player releases the decoder
+        activeDecoder = parser
         latestDecoder = WeakReference(parser)
 
         return DelegatingSubtitleDecoder(

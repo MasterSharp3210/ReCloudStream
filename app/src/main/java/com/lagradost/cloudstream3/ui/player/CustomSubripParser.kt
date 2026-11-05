@@ -14,15 +14,11 @@
  * limitations under the License.
  */
 
-
-/*
-* This is a fork of media3 subrip parses as the developers fear a flexible player, and open classes.
-*/
 package com.lagradost.cloudstream3.ui.player
 
+import android.os.Build
 import android.text.Html
 import android.text.Spanned
-import android.text.TextUtils
 import androidx.annotation.VisibleForTesting
 import androidx.media3.common.C
 import androidx.media3.common.Format
@@ -30,7 +26,6 @@ import androidx.media3.common.Format.CueReplacementBehavior
 import androidx.media3.common.text.Cue
 import androidx.media3.common.text.Cue.AnchorType
 import androidx.media3.common.util.Consumer
-import androidx.media3.common.util.Log
 import androidx.media3.common.util.ParsableByteArray
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.extractor.text.CuesWithTiming
@@ -43,7 +38,7 @@ import java.nio.charset.StandardCharsets
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 
-/** A [SubtitleParser] for SubRip.  */
+/** A resilient [SubtitleParser] for SubRip (.srt) subtitles. */
 @UnstableApi
 class CustomSubripParser : SubtitleParser {
     private val textBuilder: StringBuilder = StringBuilder()
@@ -61,7 +56,7 @@ class CustomSubripParser : SubtitleParser {
         outputOptions: OutputOptions,
         output: Consumer<CuesWithTiming>
     ) {
-        parsableByteArray.reset(data,  /* limit= */offset + length)
+        parsableByteArray.reset(data, offset + length)
         parsableByteArray.setPosition(offset)
         val charset = detectUtfCharset(parsableByteArray)
 
@@ -70,60 +65,81 @@ class CustomSubripParser : SubtitleParser {
                 ArrayList<CuesWithTiming>()
             else
                 null
-        var currentLine: String?
-        while ((parsableByteArray.readLine(charset).also { currentLine = it }) != null) {
-            if (currentLine!!.isEmpty()) {
-                // Skip blank lines.
-                continue
-            }
 
-            // Parse and check the index line.
-            try {
-                currentLine.toInt()
-            } catch (_: NumberFormatException) {
-                Log.w(TAG, "Skipping invalid index: $currentLine")
-                continue
-            }
-
-            // Read and parse the timing line.
-            currentLine = parsableByteArray.readLine(charset)
+        var currentLine: String? = null
+        while (true) {
             if (currentLine == null) {
-                Log.w(TAG, "Unexpected end")
-                break
+                currentLine = parsableByteArray.readLine(charset) ?: break
             }
-
-            val startTimeUs: Long
-            val endTimeUs: Long
-            val matcher = SUBRIP_TIMING_LINE.matcher(currentLine)
-            if (matcher.matches()) {
-                startTimeUs = parseTimecode(matcher,  /* groupOffset= */1)
-                endTimeUs = parseTimecode(matcher,  /* groupOffset= */6)
-            } else {
-                Log.w(TAG, "Skipping invalid timing: $currentLine")
+            var cleanLine = currentLine.replace("\uFEFF", "").replace("\u200B", "").trim()
+            if (cleanLine.isEmpty()) {
+                currentLine = null
                 continue
             }
 
-            // Read and parse the text and tags.
+            var timingMatcher = SUBRIP_TIMING_LINE.matcher(cleanLine)
+            if (!timingMatcher.matches()) {
+                try {
+                    cleanLine.toInt()
+                } catch (_: NumberFormatException) {
+                    val nextLine = parsableByteArray.readLine(charset) ?: break
+                    val nextClean = nextLine.replace("\uFEFF", "").replace("\u200B", "").trim()
+                    val nextMatcher = SUBRIP_TIMING_LINE.matcher(nextClean)
+                    if (!nextMatcher.matches()) {
+                        currentLine = nextLine
+                        continue
+                    }
+                    timingMatcher = nextMatcher
+                    cleanLine = nextClean
+                }
+
+                if (!timingMatcher.matches()) {
+                    val timingLine = parsableByteArray.readLine(charset) ?: break
+                    cleanLine = timingLine.replace("\uFEFF", "").replace("\u200B", "").trim()
+                    timingMatcher = SUBRIP_TIMING_LINE.matcher(cleanLine)
+                }
+            }
+
+            if (!timingMatcher.matches()) {
+                currentLine = null
+                continue
+            }
+
+            val startTimeUs = parseTimecode(timingMatcher, 1)
+            val endTimeUs = parseTimecode(timingMatcher, 6)
+
             textBuilder.setLength(0)
             tags.clear()
+
             currentLine = parsableByteArray.readLine(charset)
-            while (!TextUtils.isEmpty(currentLine)) {
+            while (currentLine != null) {
+                val lineTrim = currentLine.replace("\uFEFF", "").replace("\u200B", "").trim()
+                if (lineTrim.isEmpty()) {
+                    currentLine = null
+                    break
+                }
+                if (SUBRIP_TIMING_LINE.matcher(lineTrim).matches()) {
+                    break
+                }
                 if (textBuilder.isNotEmpty()) {
                     textBuilder.append("<br>")
                 }
-                textBuilder.append(processLine(currentLine!!, tags))
+                textBuilder.append(processLine(currentLine, tags))
                 currentLine = parsableByteArray.readLine(charset)
             }
 
-            @Suppress("DEPRECATION")
-            val text = Html.fromHtml(textBuilder.toString())
+            val text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                Html.fromHtml(textBuilder.toString(), Html.FROM_HTML_MODE_LEGACY)
+            } else {
+                @Suppress("DEPRECATION")
+                Html.fromHtml(textBuilder.toString())
+            }
 
             var alignmentTag: String? = null
             for (i in tags.indices) {
                 val tag = tags[i]
                 if (tag.matches(SUBRIP_ALIGNMENT_TAG.toRegex())) {
                     alignmentTag = tag
-                    // Subsequent alignment tags should be ignored.
                     break
                 }
             }
@@ -131,14 +147,14 @@ class CustomSubripParser : SubtitleParser {
                 output.accept(
                     CuesWithTiming(
                         ImmutableList.of<Cue>(buildCue(text, alignmentTag)),
-                        startTimeUs,  /* durationUs= */
+                        startTimeUs,
                         endTimeUs - startTimeUs
                     )
                 )
             } else cuesWithTimingBeforeRequestedStartTimeUs?.add(
                 CuesWithTiming(
                     ImmutableList.of<Cue>(buildCue(text, alignmentTag)),
-                    startTimeUs,  /* durationUs= */
+                    startTimeUs,
                     endTimeUs - startTimeUs
                 )
             )
@@ -150,55 +166,35 @@ class CustomSubripParser : SubtitleParser {
         }
     }
 
-    /**
-     * Determine UTF encoding of the byte array from a byte order mark (BOM), defaulting to UTF-8 if
-     * no BOM is found.
-     */
     private fun detectUtfCharset(data: ParsableByteArray): Charset {
         val charset = data.readUtfCharsetFromBom()
         return charset ?: StandardCharsets.UTF_8
     }
 
-    /**
-     * Trims and removes tags from the given line. The removed tags are added to `tags`.
-     *
-     * @param line The line to process.
-     * @param tags A list to which removed tags will be added.
-     * @return The processed line.
-     */
     private fun processLine(line: String, tags: ArrayList<String>): String {
-        var line = line
-        line = line.trim { it <= ' ' }
+        val lineStr = line.trim { it <= ' ' }
 
         var removedCharacterCount = 0
-        val processedLine = StringBuilder(line)
-        val matcher = SUBRIP_TAG_PATTERN.matcher(line)
+        val processedLine = StringBuilder(lineStr)
+        val matcher = SUBRIP_TAG_PATTERN.matcher(lineStr)
         while (matcher.find()) {
             val tag = matcher.group()
             tags.add(tag)
             val start = matcher.start() - removedCharacterCount
             val tagLength = tag.length
-            processedLine.replace(start,  /* end= */start + tagLength,  /* str= */"")
+            processedLine.replace(start, start + tagLength, "")
             removedCharacterCount += tagLength
         }
 
         return processedLine.toString()
     }
 
-    /**
-     * Build a [Cue] based on the given text and alignment tag.
-     *
-     * @param text The text.
-     * @param alignmentTag The alignment tag, or `null` if no alignment tag is available.
-     * @return Built cue
-     */
     private fun buildCue(text: Spanned, alignmentTag: String?): Cue {
         val cue = Cue.Builder().setText(text)
         if (alignmentTag == null) {
             return cue.build()
         }
 
-        // Horizontal alignment.
         when (alignmentTag) {
             ALIGN_BOTTOM_LEFT, ALIGN_MID_LEFT, ALIGN_TOP_LEFT -> cue.setPositionAnchor(Cue.ANCHOR_TYPE_START)
             ALIGN_BOTTOM_RIGHT, ALIGN_MID_RIGHT, ALIGN_TOP_RIGHT -> cue.setPositionAnchor(Cue.ANCHOR_TYPE_END)
@@ -206,11 +202,10 @@ class CustomSubripParser : SubtitleParser {
             else -> cue.setPositionAnchor(Cue.ANCHOR_TYPE_MIDDLE)
         }
 
-        // Vertical alignment.
         when (alignmentTag) {
             ALIGN_BOTTOM_LEFT, ALIGN_BOTTOM_MID, ALIGN_BOTTOM_RIGHT -> cue.setLineAnchor(Cue.ANCHOR_TYPE_END)
             ALIGN_TOP_LEFT, ALIGN_TOP_MID, ALIGN_TOP_RIGHT -> cue.setLineAnchor(Cue.ANCHOR_TYPE_START)
-            ALIGN_MID_LEFT, ALIGN_MID_MID, ALIGN_MID_RIGHT -> cue.setLineAnchor(Cue.ANCHOR_TYPE_MIDDLE)
+            ALIGN_MID_LEFT, ALIGN_MID_MID, ALIGN_TOP_MID -> cue.setLineAnchor(Cue.ANCHOR_TYPE_MIDDLE)
             else -> cue.setLineAnchor(Cue.ANCHOR_TYPE_MIDDLE)
         }
 
@@ -223,30 +218,20 @@ class CustomSubripParser : SubtitleParser {
     }
 
     companion object {
-        /**
-         * The [CueReplacementBehavior] for consecutive [CuesWithTiming] emitted by this
-         * implementation.
-         */
         const val CUE_REPLACEMENT_BEHAVIOR: @CueReplacementBehavior Int =
             Format.CUE_REPLACEMENT_BEHAVIOR_MERGE
 
-        // Fractional positions for use when alignment tags are present.
         private const val START_FRACTION = 0.08f
         private const val END_FRACTION = 1 - START_FRACTION
         private const val MID_FRACTION = 0.5f
 
-        private const val TAG = "SubripParser"
-
-        // The google devs are useless, this entire class is just to override this
         private const val SUBRIP_TIMECODE = "(?:(\\d+):)?(\\d+):(\\d+)(?:[,.](\\d+))?"
         private val SUBRIP_TIMING_LINE: Pattern =
             Pattern.compile("\\s*($SUBRIP_TIMECODE)\\s*-->\\s*($SUBRIP_TIMECODE)\\s*")
 
-        // NOTE: Android Studio's suggestion to simplify '\\}' is incorrect [internal: b/144480183].
         private val SUBRIP_TAG_PATTERN: Pattern = Pattern.compile("\\{\\\\.*?\\}")
         private const val SUBRIP_ALIGNMENT_TAG = "\\{\\\\an[1-9]\\}"
 
-        // Alignment tags for SSA V4+.
         private const val ALIGN_BOTTOM_LEFT = "{\\an1}"
         private const val ALIGN_BOTTOM_MID = "{\\an2}"
         private const val ALIGN_BOTTOM_RIGHT = "{\\an3}"
@@ -277,15 +262,13 @@ class CustomSubripParser : SubtitleParser {
             return timestampMs * 1000
         }
 
-        // TODO(b/289983417): Make package-private again, once it is no longer needed in
-        // DelegatingSubtitleDecoderWithSubripParserTest.java (i.e. legacy subtitle flow is removed)
         @VisibleForTesting(otherwise = VisibleForTesting.Companion.PRIVATE)
         fun getFractionalPositionForAnchorType(anchorType: @AnchorType Int): Float {
             return when (anchorType) {
                 Cue.ANCHOR_TYPE_START -> START_FRACTION
                 Cue.ANCHOR_TYPE_MIDDLE -> MID_FRACTION
                 Cue.ANCHOR_TYPE_END -> END_FRACTION
-                Cue.TYPE_UNSET ->         // Should never happen.
+                Cue.TYPE_UNSET ->
                     throw IllegalArgumentException()
 
                 else ->
