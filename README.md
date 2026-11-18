@@ -4,7 +4,7 @@
 
 # ReCloudStream
 
-*As you might imagine or already know, apps and solutions for viewing multimedia content have almost always been short-lived. They typically last only about 10 days—or, at best, a few months—before you’re forced to abandon them and move on to other platforms. ReCloudStream, by contrast, is built upon a foundation of long-term databases and code. Consequently, there won’t be frequent updates; my goal is to make the original 'CloudStream' project more secure and sustainable over time.*
+*As you might imagine or already know, apps and solutions for viewing multimedia content have almost always been short-lived. They typically last only about 10 days—or, at best, a few months—before you’re forced to abandon them and move on to other platforms. ReCloudStream, by contrast, is built upon a foundation of long-term databases and code. Consequently, there won’t be frequent updates; my goal is to make the original 'CloudStream' project more secure and sustainable over time.* **ReCloudStream is not affiliated with the original CloudStream so you don't receive any update for new versions of CloudStream. (I'm working to find new updates only for this project).**
 
 
 ## Table of Contents: 
