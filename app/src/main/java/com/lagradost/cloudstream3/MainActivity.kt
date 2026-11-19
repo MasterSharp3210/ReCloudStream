@@ -1334,7 +1334,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             }
         }
 
-        // Automatically enable jsdelivr if cant connect to raw.githubusercontent.com
         if (this.getKey<Boolean>(getString(R.string.jsdelivr_proxy_key)) == null && isNetworkAvailable()) {
             main {
                 if (checkGithubConnectivity()) {
@@ -1352,6 +1351,17 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
         }
 
         ioSafe { SafeFile.check(this@MainActivity) }
+
+        ioSafe {
+            val url = AccountManager.testAnimeFetching
+            if (url.isNotBlank()) {
+                try {
+                    app.get(url)
+                } catch (t: Throwable) {
+                    logError(t)
+                }
+            }
+        }
 
         if (PluginManager.checkSafeModeFile()) {
             safe {

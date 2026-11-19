@@ -145,7 +145,6 @@ object SettingsFragmentScreen : Screen {
             screen = SettingsUpdatesScreen,
             icon = R.drawable.mobile_arrow_down_24px,
             subtitle = persistentListOf(
-                R.string.pref_category_app_updates,
                 R.string.pref_category_backup,
                 R.string.pref_category_extensions,
                 R.string.pref_category_actions

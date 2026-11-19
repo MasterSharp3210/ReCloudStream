@@ -23,8 +23,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.mvvm.getStackTracePretty
-import com.lagradost.cloudstream3.plugins.PluginManager
 import com.lagradost.cloudstream3.ui.settings.ApkUpdater
 import com.lagradost.cloudstream3.ui.settings.GithubReleases
 import com.lagradost.cloudstream3.ui.settings.GithubReleases.APK_CONTENT_TYPE
@@ -38,7 +38,6 @@ import com.lagradost.cloudstream4.compose.Screen
 import com.lagradost.cloudstream4.compose.WhiteButton
 import com.lagradost.cloudstream4.rememberAppSettings
 import com.lagradost.cloudstream4.viewmodels.GithubAction
-import com.lagradost.cloudstream4.viewmodels.GithubAction.AutoSearchForUpdate
 import com.lagradost.cloudstream4.viewmodels.GithubAction.Dismiss
 import com.lagradost.cloudstream4.viewmodels.GithubAction.SearchForUpdate
 import com.lagradost.cloudstream4.viewmodels.GithubAction.SkipUpdate
@@ -70,11 +69,8 @@ object MainActivityScreen : Screen {
                 updater = ApkUpdater,
                 repository = GithubReleases,
             ).apply {
-                /** Only search once per session when not in safe mode */
-                if (!hasSearchedForUpdate && !PluginManager.isSafeMode()) {
-                    hasSearchedForUpdate = true
-                    onAction(AutoSearchForUpdate)
-                }
+                /** Disable automatic update check on launch */
+                hasSearchedForUpdate = true
             }
         }
     }
