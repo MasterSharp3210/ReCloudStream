@@ -1352,17 +1352,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
 
         ioSafe { SafeFile.check(this@MainActivity) }
 
-        ioSafe {
-            val url = AccountManager.testAnimeFetching
-            if (url.isNotBlank()) {
-                try {
-                    app.get(url)
-                } catch (t: Throwable) {
-                    logError(t)
-                }
-            }
-        }
-
         if (PluginManager.checkSafeModeFile()) {
             safe {
                 showToast(R.string.safe_mode_file, Toast.LENGTH_LONG)
