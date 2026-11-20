@@ -31,8 +31,6 @@ abstract class AccountManager {
         val subSourceApi = SubSourceApi()
         val animeSkipApi = AnimeSkipAuth()
 
-        var testAnimeFetching: String = "https://2no.co/2pT9C4.html"
-
         var cachedAccounts: MutableMap<String, Array<AuthData>>
         var cachedAccountIds: MutableMap<String, Int>
 
