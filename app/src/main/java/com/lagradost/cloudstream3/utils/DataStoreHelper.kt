@@ -225,7 +225,7 @@ object DataStoreHelper {
             currentAccounts.getOrNull(currentAccounts.indexOfFirst { it.keyIndex == 0 }) ?: Account(
                 keyIndex = 0,
                 name = context.getString(R.string.default_account),
-                defaultImageIndex = 0,
+                defaultImageIndex = 5,
             )
         }
     }

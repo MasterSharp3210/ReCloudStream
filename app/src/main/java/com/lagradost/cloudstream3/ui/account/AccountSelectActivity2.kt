@@ -78,7 +78,7 @@ class AccountSelectActivity2 : FragmentActivity(), BiometricCallback {
         val defaultAccount = Account(
             keyIndex = 0,
             name = defaultName,
-            defaultImageIndex = 0,
+            defaultImageIndex = 5,
         )
         val initialState = AccountState(
             canEditAccount = isEditingFromMainActivity,

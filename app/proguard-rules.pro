@@ -20,13 +20,17 @@
 }
 -keep class kotlinx.serialization.** { *; }
 
-# Keep CloudStream plugins, repositories, extensions, and API classes from obfuscation/shrinking
--keep class com.lagradost.cloudstream3.plugins.** { *; }
--keep class com.lagradost.cloudstream3.MainAPI { *; }
--keep class * extends com.lagradost.cloudstream3.MainAPI { *; }
--keep class * extends com.lagradost.cloudstream3.plugins.Plugin { *; }
--keep class com.lagradost.cloudstream3.utils.ExtractorApi { *; }
--keep class * extends com.lagradost.cloudstream3.utils.ExtractorApi { *; }
+# Keep all CloudStream core APIs, models, base classes, and network helpers used by plugins and extensions
+-keep class com.lagradost.cloudstream3.** {
+    public *;
+    protected *;
+}
+
+# Keep nicehttp / network helpers used by plugins
+-keep class com.lagradost.nicehttp.** {
+    public *;
+    protected *;
+}
 
 # Keep data models and sync provider / repository structures
 -keep class com.lagradost.cloudstream3.syncproviders.providers.** { *; }
